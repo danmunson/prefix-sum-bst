@@ -100,27 +100,52 @@ export class SumBSTBase<T> implements ISumBSTBase<T> {
     }
 
     protected _leftRotate(node: TSumNode<T>) {
-        // TODO
+        this._rotate(node, 'left');
     }
 
     protected _rightRotate(node: TSumNode<T>) {
-        // TODO
+        this._rotate(node, 'right');
     }
 
-    protected _rotate() {
-        // TODO
-    }
+    protected _rotate(node: TSumNode<T>, rotationDirection: SubtreeKey) {
+        if (!node.parent) return;
 
-    protected _newNode(data: T): TSumNode<T> {
-        const value = this.getSummableValue(data);
-        return {
-            data,
-            value,
-            leftSum: 0,
-            rightSum: 0,
-            leftCount: 0,
-            rightCount: 0,
-        };
+        const parent = node.parent;
+        const nodeTargetSubtreeKey = rotationDirection;
+        const nodeTargetSubtreeSumKey = this._sumKey(nodeTargetSubtreeKey);
+        const nodeTargetSubtreeCountKey = this._countKey(nodeTargetSubtreeKey);
+
+        const parentTargetSubtreeKey: SubtreeKey = rotationDirection === 'left' ? 'right' : 'left';
+        const parentTargetSubtreeSumKey = this._sumKey(parentTargetSubtreeKey);
+        const parentTargetSubtreeCountKey = this._countKey(parentTargetSubtreeKey);
+
+
+        // temp vars
+        const grandparentRef = parent.parent;
+        const isLessThanGrandparent = parent.isLessThanParent;
+        const nodeTargetSubtreeSum = node[this._sumKey(nodeTargetSubtreeKey)];
+        const nodeTargetSubtreeCount = node[this._countKey(nodeTargetSubtreeKey)];
+        
+        // rotate
+        parent[parentTargetSubtreeKey] = node[nodeTargetSubtreeKey];
+        parent.parent = node;
+        parent.isLessThanParent = rotationDirection === 'right';
+        node[nodeTargetSubtreeKey] = parent; // node is now the new parent
+        node.parent = grandparentRef;
+        node.isLessThanParent = isLessThanGrandparent;
+
+        // update sums
+        const newParent = node;
+        const formerParent = parent;
+
+        // the new "targetSubtree" of the former parent was assigned to it directly
+        // so the same happens with corresponding sums
+        formerParent[parentTargetSubtreeSumKey] = nodeTargetSubtreeSum;
+        formerParent[parentTargetSubtreeCountKey] = nodeTargetSubtreeCount;
+
+        // the formerParent's sums are now correct, so we can compute newParent's subtree values directly
+        newParent[nodeTargetSubtreeSumKey] = formerParent.value + formerParent.leftSum + formerParent.rightSum;
+        newParent[nodeTargetSubtreeCountKey] = 1 + formerParent.leftCount + formerParent.rightCount;
     }
 
     protected _replaceDeletedNode(deletedNode: TSumNode<T>) {
@@ -184,6 +209,18 @@ export class SumBSTBase<T> implements ISumBSTBase<T> {
             node.parent[countKey] -= 1;
             node = node.parent;
         }
+    }
+
+    protected _newNode(data: T): TSumNode<T> {
+        const value = this.getSummableValue(data);
+        return {
+            data,
+            value,
+            leftSum: 0,
+            rightSum: 0,
+            leftCount: 0,
+            rightCount: 0,
+        };
     }
 
     protected _sumKey(direction: SubtreeKey): SubtreeSumKey {
