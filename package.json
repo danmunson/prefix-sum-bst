@@ -1,0 +1,14 @@
+{
+  "name": "sum-tree",
+  "version": "1.0.0",
+  "description": "Standard BST and RBTree implementations, with an interface for fast cumulative sum access",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Daniel Munson",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.7.3"
+  }
+}
