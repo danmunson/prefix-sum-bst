@@ -1,6 +1,6 @@
-import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey} from './types';
+import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey, TraversalData} from './types';
 
-export class SumBSTBase<T> implements ISumBSTBase<T> {
+export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
     public root: TSumNode<T> = undefined;
 
     constructor(
@@ -76,27 +76,39 @@ export class SumBSTBase<T> implements ISumBSTBase<T> {
     }
 
     /*
-    Find the lowest node with a cumulative sum that is greater than or equal to the argument.
+    Find the lowest node with an inclusive cumulative sum that is greater than or equal to the argument.
     */
-    public findSupremum(sum: number): TSumNode<T> {
-        // TODO
-        return {} as any;
+    public findSupremum(targetPrefixSum: number): TraversalData<T>|undefined {
+        const {lastGreater} = this._findNearestToCumulativeValue(targetPrefixSum, 'sum');
+        return lastGreater;
     }
 
     /*
-    Find the greatest node with a cumulative sum that is less than or equal to the argument.
+    Find the greatest node with an inclusive cumulative sum that is less than or equal to the argument.
     */
-    public findInfimum(sum: number): TSumNode<T> {
-        // TODO
-        return {} as any;
+    public findInfimum(targetPrefixSum: number): TraversalData<T>|undefined {
+        const {lastLesser} = this._findNearestToCumulativeValue(targetPrefixSum, 'sum');
+        return lastLesser;
     }
 
     /*
     Find the inclusive cumulative sum of the all elements at or below the index provided
     */
-    public findInclusiveCumulativeSum(index: number): number {
-        // TODO
-        return 0;
+    public findInclusivePrefixSumAtIndex(targetIndex: number): TraversalData<T>|undefined {
+        if (!this.root || this.root.leftCount + this.root.rightCount + 1 <= targetIndex) {
+            // target index does not exist
+            return undefined;
+        }
+        const {lastLesser} = this._findNearestToCumulativeValue(targetIndex, 'index');
+        // since indexes will be an exact match, lastLesser and lastGreater are equal
+        return lastLesser;
+    }
+
+    /*
+    Find the cumulative values at a particular node
+    */
+    public findInclusivePrefixSumByNode(data: T): TraversalData<T>|undefined {
+        return this._getCumulativeValuesByExactMatch(data);
     }
 
     protected _leftRotate(node: TSumNode<T>) {
@@ -229,5 +241,106 @@ export class SumBSTBase<T> implements ISumBSTBase<T> {
 
     protected _countKey(direction: SubtreeKey): SubtreeCountKey {
         return direction === 'right' ? 'rightCount' : 'leftCount';
+    }
+
+    protected _inclusivePrefixSum(node: TSumNode<T>): number {
+        return node.leftSum + node.value;
+    }
+
+    /*
+    Traversing down the BST looking for "target cumulative value"
+    
+        (A) Target types can be indexes (a.k.a every value is 1) or sums
+            where the "summableValue" is used
+
+        (B) Every time a rightward traversal occurs
+            because:
+                target >= cumulativeSum + getValue(node)
+            then: 
+                cumulativeSum += getValue(node)
+            reasoning:
+                we have found a point at which we know this node and its left subtree
+                are all less than the sought-after count value
+        
+        (C) Every time a leftward traversal occurs
+            because:
+                target < cumulativeSum + getValue(node)
+            then: 
+                do nothing
+            because:
+                we have NOT found a point at which we know this node and its left subtree
+                are all less than the sought-after count value
+    */
+
+    protected _findNearestToCumulativeValue(targetValue: number, targetType: 'index'|'sum') {
+        let node = this.root;
+        let inclusivePrefixSum = 0;
+        let index = 0;
+        let lastLesser: TraversalData<T>|undefined = undefined;
+        let lastGreater: TraversalData<T>|undefined = undefined;
+
+        while (node) {
+            const thisNodePrefixSum = inclusivePrefixSum + node.leftSum + node.value;
+            const thisNodeIndex = index + node.leftCount; // exclusive b/c index starts at 0
+            const toCompare = targetType === 'index' ? thisNodeIndex : thisNodePrefixSum;
+
+            if (targetValue === toCompare) {
+                // Exact match, so return both
+                lastGreater = {node, inclusivePrefixSum, index};
+                lastLesser = lastGreater;
+                break;
+            } else if (targetValue > toCompare) {
+                // the node we are at is LESS than the target we seek
+                // so (B) applies
+                inclusivePrefixSum = thisNodePrefixSum;
+                index = thisNodeIndex;
+                lastLesser = {node, inclusivePrefixSum, index};
+                // traverse right
+                node = node.right;
+            } else {
+                // the node we are at is GREATER than the target we seek
+                // so (C) applies
+                lastGreater = {node, inclusivePrefixSum, index};
+                // traverse left
+                node = node.left;
+            }
+        }
+
+        return {
+            lastLesser,
+            lastGreater,
+        };
+    }
+
+    protected _getCumulativeValuesByExactMatch(data: T): TraversalData<T>|undefined {
+        let node = this.root;
+        let inclusivePrefixSum = 0;
+        let index = 0;
+
+        while (node) {
+            const thisNodePrefixSum = inclusivePrefixSum + node.leftSum + node.value;
+            const thisNodeIndex = index + node.leftCount; // exclusive b/c index starts at 0
+
+            // is the node we are looking for less than (aka right)
+            const isLessThan = this.getOrdering(data, node.data) < 0;
+
+            if (this.haveSameId(data, node.data)) {
+                // Exact match, so return both
+                return {node, inclusivePrefixSum, index};
+            } else if (!isLessThan) {
+                // Greater than, aka
+                // the node we are at is LESS than the node we seek
+                // so (B) applies
+                inclusivePrefixSum = thisNodePrefixSum;
+                index = thisNodeIndex;
+                // traverse right
+                node = node.right;
+            } else {
+                // traverse left
+                node = node.left;
+            }
+        }
+
+        return undefined;
     }
 }
