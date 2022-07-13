@@ -1,7 +1,7 @@
 import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey, TraversalData} from './types';
 
 export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
-    public root: TSumNode<T> = undefined;
+    public root: TSumNode<T>|undefined = undefined;
 
     constructor(
         public haveSameId: (x: T, y: T) => boolean,
@@ -17,7 +17,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
             return;
         }
 
-        let currentNode: TSumNode<T> = this.root;
+        let currentNode: TSumNode<T>|undefined = this.root;
         let trailingNode: TSumNode<T>;
         let isLessThan: boolean;
         do {
@@ -51,7 +51,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         if (this.root === undefined) return false;
 
         let found = false;
-        let currentNode: TSumNode<T> = this.root;
+        let currentNode: TSumNode<T>|undefined = this.root;
         let isLessThan: boolean;
         do {
             if (this.haveSameId(deletionData, currentNode.data)) {
@@ -66,7 +66,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
             }
         } while (currentNode !== undefined);
 
-        if (found) {
+        if (found && currentNode) {
             const deletedNode = currentNode;
             this._propagateSubtractionUpwards(deletedNode);
             this._replaceDeletedNode(deletedNode);
@@ -162,17 +162,18 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
 
     protected _replaceDeletedNode(deletedNode: TSumNode<T>) {
         let replacementNode = deletedNode.left || deletedNode.right;
-        if (!replacementNode) return undefined;
 
-        const whichSubtree: SubtreeKey = replacementNode.isLessThanParent ? 'left' : 'right';
+        const whichSubtree: SubtreeKey = replacementNode?.isLessThanParent ? 'left' : 'right';
         // if the node we're starting with is on the deleted node's left subtree
         // then we want the rightmost element in the deleted node's left subtree
         const searchDirection: SubtreeKey = whichSubtree === 'left' ? 'right' : 'left';
         const intermediates = [];
-        while (replacementNode[searchDirection]) {
+        while (replacementNode && replacementNode[searchDirection]) {
             intermediates.push(replacementNode);
             replacementNode = replacementNode[searchDirection];
         }
+
+        if (!replacementNode) return undefined;
 
         // deal with the special case of a child being the replacement node
         if (intermediates.length === 0) {
@@ -186,7 +187,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
             replacementNode[countKey] = deletedNode[countKey];
         } else {
             // sever replacement node
-            replacementNode.parent[searchDirection] = undefined;
+            replacementNode.parent![searchDirection] = undefined; // parent must exist by definition
             replacementNode.left = deletedNode.left;
             replacementNode.right = deletedNode.right;
 
@@ -326,7 +327,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
 
             if (this.haveSameId(data, node.data)) {
                 // Exact match, so return both
-                return {node, inclusivePrefixSum, index};
+                return {node, inclusivePrefixSum: thisNodePrefixSum, index: thisNodeIndex};
             } else if (!isLessThan) {
                 // Greater than, aka
                 // the node we are at is LESS than the node we seek

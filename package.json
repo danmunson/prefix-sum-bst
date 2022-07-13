@@ -4,11 +4,17 @@
   "description": "Standard BST and RBTree implementations, with an interface for fast cumulative sum access",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "ts-mocha ./test/**/*.spec.ts"
   },
   "author": "Daniel Munson",
   "license": "MIT",
   "devDependencies": {
+    "@types/chai": "^4.3.1",
+    "@types/mocha": "^9.1.1",
+    "chai": "^4.3.6",
+    "mocha": "^10.0.0",
+    "ts-mocha": "^10.0.0",
+    "ts-node": "^7.0.1",
     "typescript": "^4.7.3"
   }
 }
