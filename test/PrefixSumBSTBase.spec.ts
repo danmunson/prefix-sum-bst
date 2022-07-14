@@ -6,13 +6,15 @@ const randomExponent = 123;
 const randomModulus = 45678901; // prime, nice
 
 function makeSequence(upperLimit: number): TestData[] {
-    return Array(upperLimit).fill(undefined)
+    const shuffledSeq = Array(upperLimit).fill(undefined)
         .map((x, i) => ({
             value: i + 1,
-            randomSortFactor: ((i + 1) ** randomExponent) % randomModulus,
+            randomSortFactor: ((i + 123) ** randomExponent) % randomModulus,
             id: `id-${i + 1}`,
         }))
         .sort((x, y) => x.randomSortFactor - y.randomSortFactor);
+
+    return shuffledSeq;
 }
 
 function sumOfOneThru(N: number) {
@@ -56,14 +58,14 @@ describe('basic correctness', () => {
         assert.strictEqual(result?.node.data.id, 'id-76');
     });
 
-    it('findInclusivePrefixSumAtIndex', () => {
-        const result = bst.findInclusivePrefixSumAtIndex(49);
-        assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(50))
-    });
-
     it('findInclusivePrefixSumByNode', () => {
         const result = bst.findInclusivePrefixSumByNode({id: 'id-34', value: 34});
         assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(34));
+    });
+
+    it('findInclusivePrefixSumAtIndex', () => {
+        const result = bst.findInclusivePrefixSumAtIndex(49);
+        assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(50))
     });
 });
 

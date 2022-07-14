@@ -99,7 +99,8 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
             // target index does not exist
             return undefined;
         }
-        const {lastLesser} = this._findNearestToCumulativeValue(targetIndex, 'index');
+        // targetIndex + 1, since index is 0-based
+        const {lastLesser} = this._findNearestToCumulativeValue(targetIndex + 1, 'count');
         // since indexes will be an exact match, lastLesser and lastGreater are equal
         return lastLesser;
     }
@@ -273,35 +274,35 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
                 are all less than the sought-after count value
     */
 
-    protected _findNearestToCumulativeValue(targetValue: number, targetType: 'index'|'sum') {
+    protected _findNearestToCumulativeValue(targetValue: number, targetType: 'count'|'sum') {
         let node = this.root;
         let inclusivePrefixSum = 0;
-        let index = 0;
+        let inclusivePrefixCount = 0;
         let lastLesser: TraversalData<T>|undefined = undefined;
         let lastGreater: TraversalData<T>|undefined = undefined;
 
         while (node) {
             const thisNodePrefixSum = inclusivePrefixSum + node.leftSum + node.value;
-            const thisNodeIndex = index + node.leftCount; // exclusive b/c index starts at 0
-            const toCompare = targetType === 'index' ? thisNodeIndex : thisNodePrefixSum;
+            const thisNodeIndex = inclusivePrefixCount + node.leftCount + 1;
+            const toCompare = targetType === 'count' ? thisNodeIndex : thisNodePrefixSum;
 
             if (targetValue === toCompare) {
                 // Exact match, so return both
-                lastGreater = {node, inclusivePrefixSum, index};
+                lastGreater = {node, inclusivePrefixSum: thisNodePrefixSum, inclusivePrefixCount: thisNodeIndex};
                 lastLesser = lastGreater;
                 break;
             } else if (targetValue > toCompare) {
                 // the node we are at is LESS than the target we seek
                 // so (B) applies
                 inclusivePrefixSum = thisNodePrefixSum;
-                index = thisNodeIndex;
-                lastLesser = {node, inclusivePrefixSum, index};
+                inclusivePrefixCount = thisNodeIndex;
+                lastLesser = {node, inclusivePrefixSum, inclusivePrefixCount};
                 // traverse right
                 node = node.right;
             } else {
                 // the node we are at is GREATER than the target we seek
                 // so (C) applies
-                lastGreater = {node, inclusivePrefixSum, index};
+                lastGreater = {node, inclusivePrefixSum, inclusivePrefixCount};
                 // traverse left
                 node = node.left;
             }
@@ -316,24 +317,24 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
     protected _getCumulativeValuesByExactMatch(data: T): TraversalData<T>|undefined {
         let node = this.root;
         let inclusivePrefixSum = 0;
-        let index = 0;
+        let inclusivePrefixCount = 0;
 
         while (node) {
             const thisNodePrefixSum = inclusivePrefixSum + node.leftSum + node.value;
-            const thisNodeIndex = index + node.leftCount; // exclusive b/c index starts at 0
+            const thisNodeIndex = inclusivePrefixCount + node.leftCount;
 
             // is the node we are looking for less than (aka right)
             const isLessThan = this.getOrdering(data, node.data) < 0;
 
             if (this.haveSameId(data, node.data)) {
                 // Exact match, so return both
-                return {node, inclusivePrefixSum: thisNodePrefixSum, index: thisNodeIndex};
+                return {node, inclusivePrefixSum: thisNodePrefixSum, inclusivePrefixCount: thisNodeIndex};
             } else if (!isLessThan) {
                 // Greater than, aka
                 // the node we are at is LESS than the node we seek
                 // so (B) applies
                 inclusivePrefixSum = thisNodePrefixSum;
-                index = thisNodeIndex;
+                inclusivePrefixCount = thisNodeIndex;
                 // traverse right
                 node = node.right;
             } else {

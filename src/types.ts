@@ -18,7 +18,7 @@ export type SubtreeCountKey = keyof TSumNode<any> & 'leftCount'|'rightCount';
 export type TraversalData<T> = {
     node: TSumNode<T>,
     inclusivePrefixSum: number,
-    index: number,
+    inclusivePrefixCount: number,
 };
 
 export interface ISumBSTBase<T> {
