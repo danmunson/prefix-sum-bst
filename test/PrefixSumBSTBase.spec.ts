@@ -53,8 +53,18 @@ describe('basic correctness', () => {
         assert.strictEqual(result?.node.data.id, 'id-75');
     });
 
+    it('findInfimum exact', () => {
+        const result = bst.findInfimum(sumOfOneThru(75));
+        assert.strictEqual(result?.node.data.id, 'id-75');
+    });
+
     it('findSupremum', () => {
         const result = bst.findSupremum(sumOfOneThru(75) + 1);
+        assert.strictEqual(result?.node.data.id, 'id-76');
+    });
+
+    it('findSupremum exact', () => {
+        const result = bst.findSupremum(sumOfOneThru(76));
         assert.strictEqual(result?.node.data.id, 'id-76');
     });
 
