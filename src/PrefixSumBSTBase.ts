@@ -209,7 +209,6 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         replacementNode.isLessThanParent = deletedNode.isLessThanParent;
     }
 
-    // private _propagateSubtractionUpwards(initialNode: TSumNode<T>, initialSumKey: SubtreeSumKey, value: number) {
     protected _propagateSubtractionUpwards(deletedNode: TSumNode<T>) {
         const toSubtract = deletedNode.value;
         let node: TSumNode<T>|undefined = deletedNode;
