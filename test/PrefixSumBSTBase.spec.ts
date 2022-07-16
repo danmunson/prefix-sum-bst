@@ -7,8 +7,9 @@ import {
     makeShuffledSequence,
     makeTestNode,
     sumOfOneThru,
-    TestData
-} from "./correctness";
+    TestData,
+    treeHash
+} from "./utils";
 
 function insertSequence(bst: PrefixSumBSTBase<TestData>, upperLimit: number) {
     return makeShuffledSequence(upperLimit).forEach((data) => bst.insert(data));
@@ -22,6 +23,19 @@ function findLeafNode(node: TSumNode<TestData>): TSumNode<TestData> {
     if (node.left) return findLeafNode(node.left);
     if (node.right) return findLeafNode(node.right);
     return node;
+}
+
+function getNodeByValue(bst: PrefixSumBSTBase<TestData>, n: number) {
+    const result = bst.findInfimum(sumOfOneThru(n));
+    return result?.node;
+}
+
+function rotateNodesUpwardByValue(bst: PrefixSumBSTBase<TestData>, values: number[]) {
+    const nodes = values.map((x) => getNodeByValue(bst, x));
+    for (const node of nodes) {
+        assert(node);
+        bst['_rotateUp'](node!);
+    }
 }
 
 describe('Basic correctness', () => {
@@ -60,19 +74,23 @@ describe('Basic correctness', () => {
         });
 
         it('deleted values', () => {
-            deleteNodes(bst, [25, 50, 75]);
+            assertCorrectBST(bst.root!);
+            // randomly chosen numbers
+            const elementsToRemove = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99];
+            const removedSum = elementsToRemove.reduce((a, b) => a + b, 0);
+            deleteNodes(bst, elementsToRemove);
             assertCorrectBST(bst.root!);
             let fullValues = assertCorrectSubtreeSums(bst.root!);
-            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - (25 + 50 + 75));
-            assert.strictEqual(fullValues.count, 97);
+            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - removedSum);
+            assert.strictEqual(fullValues.count, 100 - elementsToRemove.length);
 
             // delete root as special case
             const rootValue = bst.root!.data.value;
             deleteNodes(bst, [rootValue]);
             assertCorrectBST(bst.root!);
             fullValues = assertCorrectSubtreeSums(bst.root!);
-            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - (25 + 50 + 75 + rootValue));
-            assert.strictEqual(fullValues.count, 96);
+            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - (removedSum + rootValue));
+            assert.strictEqual(fullValues.count, 100 - elementsToRemove.length - 1);
 
             // find & delete leaf nodes as special case
             const leafNode = findLeafNode(bst.root!);
@@ -80,13 +98,49 @@ describe('Basic correctness', () => {
             deleteNodes(bst, [leafValue]);
             assertCorrectBST(bst.root!);
             fullValues = assertCorrectSubtreeSums(bst.root!);
-            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - (25 + 50 + 75 + rootValue + leafValue));
-            assert.strictEqual(fullValues.count, 95);
-
+            assert.strictEqual(fullValues.sum, sumOfOneThru(100) - (removedSum + rootValue + leafValue));
+            assert.strictEqual(fullValues.count, 100 - elementsToRemove.length - 2);
         });
 
-        it('deleted root', () => {
-            
+        it('rotation', () => {
+            // trying to rotate root should fail
+            let initialRootValue = bst.root!.data.value;
+            rotateNodesUpwardByValue(bst, [initialRootValue]);
+            assert.strictEqual(bst.root!.data.value, initialRootValue); // nothing has changed
+
+            // rotations should act as expected, e.g. parent and child swap relations
+            const initialTreeHash = {};
+            treeHash(initialTreeHash, bst.root!, '-');
+
+            initialRootValue = bst.root!.data.value;
+            let initialLeftChildValue = bst.root!.left?.data.value;
+            assert(initialLeftChildValue);
+
+            rotateNodesUpwardByValue(bst, [initialLeftChildValue]);
+            assert.strictEqual(bst.root!.data.value, initialLeftChildValue);
+            assert.strictEqual(bst.root!.right?.data.value, initialRootValue);
+
+            // rotations are invertable
+            rotateNodesUpwardByValue(bst, [initialRootValue]);
+            const postRotationsTreeHash = {};
+            treeHash(postRotationsTreeHash, bst.root!, '-');
+            assert.deepStrictEqual(postRotationsTreeHash, initialTreeHash);
+
+            // all rotations should preserve PrefixSumBST properties
+            assertCorrectBST(bst.root!);
+            let fullValues = assertCorrectSubtreeSums(bst.root!);
+            assert.strictEqual(fullValues.sum, sumOfOneThru(100));
+            assert.strictEqual(fullValues.count, 100);
+
+            const nodeValuesToRotate = [
+                1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99
+            ].filter(x => x !== bst.root!.data.value);
+            rotateNodesUpwardByValue(bst, nodeValuesToRotate);
+
+            assertCorrectBST(bst.root!);
+            fullValues = assertCorrectSubtreeSums(bst.root!);
+            assert.strictEqual(fullValues.sum, sumOfOneThru(100));
+            assert.strictEqual(fullValues.count, 100);
         });
     });
 
@@ -117,13 +171,19 @@ describe('Basic correctness', () => {
         });
 
         it('findInclusivePrefixSumByNode', () => {
-            const result = bst.findInclusivePrefixSumByNode({id: 'id-34', value: 34});
+            let result = bst.findInclusivePrefixSumByNode({id: 'id-34', value: 34});
             assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(34));
+
+            result = bst.findInclusivePrefixSumByNode({id: 'id-1000', value: 1000});
+            assert.strictEqual(result, undefined);
         });
 
         it('findInclusivePrefixSumAtIndex', () => {
-            const result = bst.findInclusivePrefixSumAtIndex(49);
-            assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(50))
+            let result = bst.findInclusivePrefixSumAtIndex(49);
+            assert.strictEqual(result?.inclusivePrefixSum, sumOfOneThru(50));
+
+            result = bst.findInclusivePrefixSumAtIndex(1000);
+            assert.strictEqual(result, undefined);
         });
     });
 });

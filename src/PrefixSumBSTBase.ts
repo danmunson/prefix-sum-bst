@@ -1,3 +1,4 @@
+import { loggableSubtreeString } from '../test/utils';
 import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey, TraversalData} from './types';
 
 export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
@@ -44,7 +45,8 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
 
         if (isLessThan) trailingNode.left = insertNode;
         else trailingNode.right = insertNode;
-        trailingNode.isLessThanParent = isLessThan;
+        insertNode.parent = trailingNode;
+        insertNode.isLessThanParent = isLessThan;
     }
 
     public delete(deletionData: T) {
@@ -67,9 +69,7 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         } while (currentNode !== undefined);
 
         if (found && currentNode) {
-            const deletedNode = currentNode;
-            this._propagateSubtractionUpwards(deletedNode);
-            this._replaceDeletedNode(deletedNode);
+            this._replaceDeletedNode(currentNode);
         }
         
         return found;
@@ -112,42 +112,48 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         return this._getCumulativeValuesByExactMatch(data);
     }
 
-    protected _leftRotate(node: TSumNode<T>) {
-        this._rotate(node, 'left');
-    }
-
-    protected _rightRotate(node: TSumNode<T>) {
-        this._rotate(node, 'right');
-    }
-
-    protected _rotate(node: TSumNode<T>, rotationDirection: SubtreeKey) {
+    protected _rotateUp(node: TSumNode<T>) {
         if (!node.parent) return;
 
         const parent = node.parent;
+        const [rotationDirection, parentTargetSubtreeKey]: [SubtreeKey, SubtreeKey] = (
+            node.isLessThanParent ? ['right', 'left'] : ['left', 'right']
+        );
+        const parentTargetSubtreeSumKey = this._sumKey(parentTargetSubtreeKey);
+        const parentTargetSubtreeCountKey = this._countKey(parentTargetSubtreeKey);
+
         const nodeTargetSubtreeKey = rotationDirection;
         const nodeTargetSubtreeSumKey = this._sumKey(nodeTargetSubtreeKey);
         const nodeTargetSubtreeCountKey = this._countKey(nodeTargetSubtreeKey);
 
-        const parentTargetSubtreeKey: SubtreeKey = rotationDirection === 'left' ? 'right' : 'left';
-        const parentTargetSubtreeSumKey = this._sumKey(parentTargetSubtreeKey);
-        const parentTargetSubtreeCountKey = this._countKey(parentTargetSubtreeKey);
-
-
         // temp vars
+        const nodeTargetSubtree = node[nodeTargetSubtreeKey];
         const grandparentRef = parent.parent;
         const isLessThanGrandparent = parent.isLessThanParent;
+        const grandparentSubtreeKey: SubtreeKey = isLessThanGrandparent ? 'left' : 'right';
         const nodeTargetSubtreeSum = node[this._sumKey(nodeTargetSubtreeKey)];
         const nodeTargetSubtreeCount = node[this._countKey(nodeTargetSubtreeKey)];
         
         // rotate
-        parent[parentTargetSubtreeKey] = node[nodeTargetSubtreeKey];
+        parent[parentTargetSubtreeKey] = nodeTargetSubtree;
+        if (nodeTargetSubtree) {
+            nodeTargetSubtree.parent = parent;
+            nodeTargetSubtree.isLessThanParent = rotationDirection === 'right';
+        }
+
         parent.parent = node;
-        parent.isLessThanParent = rotationDirection === 'right';
+        parent.isLessThanParent = rotationDirection !== 'right';
         node[nodeTargetSubtreeKey] = parent; // node is now the new parent
         node.parent = grandparentRef;
         node.isLessThanParent = isLessThanGrandparent;
+        if (grandparentRef) {
+            grandparentRef[grandparentSubtreeKey] = node;
+        } else {
+            // no grandparent, so node is the new root
+            this.root = node;
+        }
 
-        // update sums
+        // update naming
         const newParent = node;
         const formerParent = parent;
 
@@ -162,6 +168,8 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
     }
 
     protected _replaceDeletedNode(deletedNode: TSumNode<T>) {
+        const grandparent = deletedNode.parent;
+        const grandparentSubtreeKey: SubtreeKey = deletedNode.isLessThanParent ? 'left' : 'right';
         let replacementNode = deletedNode.left || deletedNode.right;
 
         const whichSubtree: SubtreeKey = replacementNode?.isLessThanParent ? 'left' : 'right';
@@ -174,39 +182,61 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
             replacementNode = replacementNode[searchDirection];
         }
 
-        if (!replacementNode) return undefined;
+        if (replacementNode) {
+            // deal with the special case of a child being the replacement node
+            if (intermediates.length === 0) {
+                // this child was situated on the opposite side of [searchDirection] of parent
+                // so it inherits [searchDirection]
+                replacementNode[searchDirection] = deletedNode[searchDirection];
+                if (replacementNode[searchDirection]) {
+                    replacementNode[searchDirection]!.parent = replacementNode;
+                }
+                // update sums and counts
+                const sumKey = this._sumKey(searchDirection);
+                const countKey = this._countKey(searchDirection);
+                replacementNode[sumKey] = deletedNode[sumKey];
+                replacementNode[countKey] = deletedNode[countKey];
+            } else {
+                // extract replacement node from tree by assigning its child (
+                //      of which there can be at most 1, and only on the subtree opposite
+                //      the search direction, since after all the replacement node
+                //      is defined as being the [searchDirection-most] node in a subtree
+                // ) to its parent
+                replacementNode.parent![searchDirection] = replacementNode[whichSubtree];
+                if (replacementNode[whichSubtree]) {
+                    replacementNode[whichSubtree]!.parent = replacementNode.parent;
+                }
 
-        // deal with the special case of a child being the replacement node
-        if (intermediates.length === 0) {
-            // this child was situated on the opposite side of [searchDirection] of parent
-            // so it inherits [searchDirection]
-            replacementNode[searchDirection] = deletedNode[searchDirection];
-            // update sums and counts
-            const sumKey = this._sumKey(searchDirection);
-            const countKey = this._countKey(searchDirection);
-            replacementNode[sumKey] = deletedNode[sumKey];
-            replacementNode[countKey] = deletedNode[countKey];
-        } else {
-            // sever replacement node
-            replacementNode.parent![searchDirection] = undefined; // parent must exist by definition
-            replacementNode.left = deletedNode.left;
-            replacementNode.right = deletedNode.right;
+                replacementNode.left = deletedNode.left;
+                if (replacementNode.left) replacementNode.left.parent = replacementNode;
 
-            // update sums and counts
-            for (const node of intermediates) {
-                node[this._sumKey(searchDirection)] -= replacementNode.value;
-                node[this._countKey(searchDirection)] -= 1;
+                replacementNode.right = deletedNode.right;
+                if (replacementNode.right) replacementNode.right.parent = replacementNode;
+
+                // update sums and counts for the subtree the replacement node was extracted from
+                for (const node of intermediates) {
+                    node[this._sumKey(searchDirection)] -= replacementNode.value;
+                    node[this._countKey(searchDirection)] -= 1;
+                }
+                replacementNode[this._sumKey(searchDirection)] = deletedNode[this._sumKey(searchDirection)];
+                replacementNode[this._countKey(searchDirection)] = deletedNode[this._countKey(searchDirection)];
+                // suppose replacement node was in the left subtree of the deleted node
+                // now, the replacement node has the same leftSum as the deleted node, minus its own value
+                replacementNode[this._sumKey(whichSubtree)] = deletedNode[this._sumKey(whichSubtree)] - replacementNode.value;
+                replacementNode[this._countKey(whichSubtree)] = deletedNode[this._countKey(whichSubtree)] - 1;
             }
-            replacementNode[this._sumKey(searchDirection)] = deletedNode[this._sumKey(searchDirection)];
-            replacementNode[this._countKey(searchDirection)] = deletedNode[this._countKey(searchDirection)];
-            // suppose replacement node was in the left subtree of the deleted node
-            // now, the replacement node has the same leftSum as the deleted node, minus its own value
-            replacementNode[this._sumKey(whichSubtree)] = deletedNode[this._sumKey(searchDirection)] - replacementNode.value;
-            replacementNode[this._countKey(whichSubtree)] = deletedNode[this._countKey(searchDirection)] - 1;
+
+            replacementNode.parent = deletedNode.parent;
+            replacementNode.isLessThanParent = deletedNode.isLessThanParent;
         }
 
-        replacementNode.parent = deletedNode.parent;
-        replacementNode.isLessThanParent = deletedNode.isLessThanParent;
+        if (grandparent) {
+            grandparent[grandparentSubtreeKey] = replacementNode;
+            this._propagateSubtractionUpwards(deletedNode);
+        } else {
+            // if the deleted node had no parent, then it was the root
+            this.root = replacementNode;
+        }
     }
 
     protected _propagateSubtractionUpwards(deletedNode: TSumNode<T>) {
@@ -242,10 +272,6 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
 
     protected _countKey(direction: SubtreeKey): SubtreeCountKey {
         return direction === 'right' ? 'rightCount' : 'leftCount';
-    }
-
-    protected _inclusivePrefixSum(node: TSumNode<T>): number {
-        return node.leftSum + node.value;
     }
 
     /*
