@@ -1,5 +1,11 @@
-import { loggableSubtreeString } from '../test/utils';
-import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey, TraversalData} from './types';
+import {
+    TSumNode,
+    ISumBSTBase,
+    SubtreeKey,
+    SubtreeSumKey,
+    SubtreeCountKey,
+    TraversalData
+} from './types';
 
 export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
     public root: TSumNode<T>|undefined = undefined;
@@ -10,12 +16,12 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         public getOrdering: (x: T, y: T) => number,
     ) {}
 
-    public insert(x: T) {
+    public insert(x: T): TSumNode<T> {
         const insertNode = this._newNode(x);
 
         if (this.root === undefined) {
             this.root = insertNode;
-            return;
+            return insertNode;
         }
 
         let currentNode: TSumNode<T>|undefined = this.root;
@@ -47,6 +53,8 @@ export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
         else trailingNode.right = insertNode;
         insertNode.parent = trailingNode;
         insertNode.isLessThanParent = isLessThan;
+
+        return insertNode;
     }
 
     public delete(deletionData: T) {
