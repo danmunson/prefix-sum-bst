@@ -1,5 +1,11 @@
-import { loggableSubtreeString } from '../test/utils';
-import {TSumNode, ISumBSTBase, SubtreeKey, SubtreeSumKey, SubtreeCountKey, TraversalData} from './types';
+import {
+    TSumNode,
+    ISumBSTBase,
+    SubtreeKey,
+    SubtreeSumKey,
+    SubtreeCountKey,
+    TraversalData
+} from './types';
 
 export class PrefixSumBSTBase<T> implements ISumBSTBase<T> {
     public root: TSumNode<T>|undefined = undefined;
